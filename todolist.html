@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>To-Do List Progress</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body style="background: url('image-avif.png') no-repeat center center fixed; background-size: cover;">
+    <button id="logout-btn">Log Out</button>
+    <body>
+    <h1>To-Do List Tracker</h1>
+    <div id="user-info" style="text-align: center; margin-bottom: 20px;"></div>
+    <div class="container">
+        <div class="date-picker" id="date-picker">
+            <input type="date" id="date">
+        </div>
+        <div class="task-section">
+            <div class="add-task">
+                <input type="text" id="task-input" placeholder="Add a new task...">
+                <button id="add-btn">Add Task</button>
+                <button id="refresh-btn">Refresh</button>
+            </div>
+            <div class="my-task-label">My Tasks:</div>
+            <ul class="task-list" id="task-list"></ul>
+        </div>
+        <div class="progress-bar-container" id="progress-bar-container">
+            <span class="progress-label">Progress:</span>
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-bar-inner" id="progress-bar-inner"></div>
+            </div>
+            <span id="progress-percent">0%</span>
+        </div>
+    </div>
+    <ul class="task-list" id="task-list"></ul>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+    <script>
+        // Firebase config - replaced with actual config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBGDWQJiQ2MyPnKJhTlz7UYxIrarAYffx0",
+            authDomain: "todolist-99c61.firebaseapp.com",
+            projectId: "todolist-99c61",
+            storageBucket: "todolist-99c61.firebasestorage.app",
+            messagingSenderId: "249873754383",
+            appId: "1:249873754383:web:0757d9a0869b5459beb67a",
+            measurementId: "G-GGGGQP32BT"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const logoutBtn = document.getElementById("logout-btn");
+        const dateInput = document.getElementById("date");
+        const taskInput = document.getElementById("task-input");
+        const addBtn = document.getElementById("add-btn");
+        const refreshBtn = document.getElementById("refresh-btn");
+        const taskList = document.getElementById("task-list");
+
+        // Set default date to today or saved
+        const today = new Date().toISOString().split("T")[0];
+        const savedDate = localStorage.getItem('selectedDate');
+        // Will set value in auth callback based on admin status
+
+        function getPHDate() {
+            const dateStr = new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
+            const [month, day, year] = dateStr.split('/');
+            return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`;
+        }
+
+        let isAdmin = false;
+
+        // Redirect to login if not authenticated
+        auth.onAuthStateChanged((user) => {
+            if (!user) {
+                window.location.href = "index.html";
+            } else {
+                isAdmin = user.email === "admin@todolist.com";
+                const userInfo = document.getElementById("user-info");
+                const displayName = user.displayName || user.email;
+                userInfo.innerHTML = `<span>Welcome, ${displayName}!</span>`;
+                if (!isAdmin) {
+                    const phDate = getPHDate();
+                    dateInput.value = savedDate || phDate;
+                    dateInput.max = phDate;
+                    const editBtn = document.createElement("button");
+                    editBtn.textContent = "Edit Profile";
+                    editBtn.style.marginLeft = "10px";
+                    editBtn.style.padding = "5px 10px";
+                    editBtn.style.backgroundColor = "hsl(313, 80%, 57%)";
+                    editBtn.style.color = "white";
+                    editBtn.style.border = "none";
+                    editBtn.style.borderRadius = "5px";
+                    editBtn.style.cursor = "pointer";
+                    editBtn.addEventListener("click", () => {
+                        // Create modal for editing profile
+                        const modal = document.createElement('div');
+                        modal.style.position = 'fixed';
+                        modal.style.top = '0';
+                        modal.style.left = '0';
+                        modal.style.width = '100%';
+                        modal.style.height = '100%';
+                        modal.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                        modal.style.display = 'flex';
+                        modal.style.justifyContent = 'center';
+                        modal.style.alignItems = 'center';
+                        modal.style.zIndex = '1000';
+
+                        const modalContent = document.createElement('div');
+                        modalContent.style.backgroundColor = 'white';
+                        modalContent.style.padding = '20px';
+                        modalContent.style.borderRadius = '8px';
+                        modalContent.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+                        modalContent.style.maxWidth = '400px';
+                        modalContent.style.width = '100%';
+
+                        const title = document.createElement('h3');
+                        title.textContent = 'Edit Profile';
+                        modalContent.appendChild(title);
+
+                        const label = document.createElement('label');
+                        label.textContent = 'Display Name:';
+                        label.style.display = 'block';
+                        label.style.marginBottom = '10px';
+                        modalContent.appendChild(label);
+
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.value = displayName;
+                        input.style.width = '100%';
+                        input.style.padding = '8px';
+                        input.style.marginBottom = '20px';
+                        input.style.border = '1px solid #ccc';
+                        input.style.borderRadius = '4px';
+                        modalContent.appendChild(input);
+
+                        const buttonContainer = document.createElement('div');
+                        buttonContainer.style.display = 'flex';
+                        buttonContainer.style.justifyContent = 'space-between';
+
+                        const saveBtn = document.createElement('button');
+                        saveBtn.textContent = 'Save';
+                        saveBtn.style.padding = '10px 20px';
+                        saveBtn.style.backgroundColor = 'hsl(313, 80%, 57%)';
+                        saveBtn.style.color = 'white';
+                        saveBtn.style.border = 'none';
+                        saveBtn.style.borderRadius = '5px';
+                        saveBtn.style.cursor = 'pointer';
+                        buttonContainer.appendChild(saveBtn);
+
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.textContent = 'Cancel';
+                        cancelBtn.style.padding = '10px 20px';
+                        cancelBtn.style.backgroundColor = '#ccc';
+                        cancelBtn.style.border = 'none';
+                        cancelBtn.style.borderRadius = '5px';
+                        cancelBtn.style.cursor = 'pointer';
+                        buttonContainer.appendChild(cancelBtn);
+
+                        modalContent.appendChild(buttonContainer);
+                        modal.appendChild(modalContent);
+                        document.body.appendChild(modal);
+
+                        saveBtn.addEventListener('click', () => {
+                            const newName = input.value.trim();
+                            if (newName) {
+                                user.updateProfile({ displayName: newName }).then(() => {
+                                    userInfo.innerHTML = `<span>Welcome, ${newName}!</span>`;
+                                    userInfo.appendChild(editBtn);
+                                    document.body.removeChild(modal);
+                                }).catch(error => {
+                                    alert('Error updating profile: ' + error.message);
+                                });
+                            } else {
+                                alert('Display name cannot be empty.');
+                            }
+                        });
+
+                        cancelBtn.addEventListener('click', () => {
+                            document.body.removeChild(modal);
+                        });
+                    });
+                    userInfo.appendChild(editBtn);
+                } else {
+                    dateInput.value = savedDate || today;
+                    // Show admin link if admin
+                    const adminLink = document.createElement("a");
+                    adminLink.href = "admin.html";
+                    adminLink.textContent = "Admin Panel";
+                    adminLink.style.marginLeft = "20px";
+                    document.querySelector("h1").appendChild(adminLink);
+                }
+            }
+        });
+
+        // Log out
+        logoutBtn.addEventListener("click", () => {
+            auth.signOut();
+        });
+
+        let tasks = [];
+        let unsubscribe = null;
+
+        // Load tasks for the selected date from Firestore
+        function loadTasks() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const date = dateInput.value;
+            if (unsubscribe) unsubscribe();
+            const query = db
+                .collection("tasks")
+                .where("userId", "==", user.uid)
+                .where("date", "==", date);
+            unsubscribe = query.onSnapshot((snapshot) => {
+                tasks = [];
+                snapshot.forEach((doc) => {
+                    tasks.push({ id: doc.id, ...doc.data() });
+                });
+                renderTasks(tasks);
+            });
+        }
+
+        // Render tasks
+        function renderTasks(tasks) {
+            // Filter out deleted tasks
+            tasks = tasks.filter(task => !task.deleted);
+            taskList.innerHTML = "";
+            tasks.forEach((task) => {
+                const li = document.createElement("li");
+                li.className = "task-item" + (task.completed ? " completed" : "");
+                li.innerHTML = `
+                    <input type="checkbox" class="task-checkbox" ${
+                      task.completed ? "checked" : ""
+                    } data-id="${task.id}">
+                    <span class="task-text">${task.text}${task.deadline ? ` (Deadline: ${task.deadline})` : ''}</span>
+                    <button class="delete-btn" data-id="${task.id}">Delete</button>
+                `;
+                taskList.appendChild(li);
+            });
+            updateProgressBar(tasks);
+        }
+
+        // Update progress bar
+        function updateProgressBar(tasks) {
+            const progressBarInner = document.getElementById("progress-bar-inner");
+            const progressPercent = document.getElementById("progress-percent");
+            if (tasks.length === 0) {
+                progressBarInner.style.width = '0%';
+                progressPercent.textContent = '0%';
+                return;
+            }
+            const completedCount = tasks.filter(task => task.completed).length;
+            const percent = Math.round((completedCount / tasks.length) * 100);
+            progressBarInner.style.width = percent + '%';
+            progressPercent.textContent = percent + '%';
+        }
+
+        // Add task to Firestore
+        addBtn.addEventListener("click", () => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const text = taskInput.value.trim();
+            if (!text) return;
+
+            // Create popup container for deadline input
+            const popup = document.createElement('div');
+            popup.style.position = 'fixed';
+            popup.style.top = '50%';
+            popup.style.left = '50%';
+            popup.style.transform = 'translate(-50%, -50%)';
+            popup.style.backgroundColor = 'white';
+            popup.style.padding = '20px';
+            popup.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+            popup.style.zIndex = '1000';
+
+            const label = document.createElement('label');
+            label.textContent = 'Does this task have a deadline?';
+            popup.appendChild(label);
+
+            const yesBtn = document.createElement('button');
+            yesBtn.textContent = 'YES';
+            yesBtn.style.margin = '10px';
+            popup.appendChild(yesBtn);
+
+            const noBtn = document.createElement('button');
+            noBtn.textContent = 'NO';
+            noBtn.style.margin = '10px';
+            popup.appendChild(noBtn);
+
+            document.body.appendChild(popup);
+
+            yesBtn.addEventListener('click', () => {
+                const deadlineInput = document.createElement('input');
+                deadlineInput.type = 'date';
+                deadlineInput.value = new Date().toISOString().split('T')[0];
+                deadlineInput.style.display = 'block';
+                deadlineInput.style.marginTop = '10px';
+                popup.appendChild(deadlineInput);
+
+                const submitBtn = document.createElement('button');
+                submitBtn.textContent = 'Submit';
+                submitBtn.style.marginTop = '10px';
+                popup.appendChild(submitBtn);
+
+                submitBtn.addEventListener('click', () => {
+                    const deadline = deadlineInput.value;
+                    if (!deadline) {
+                        alert('Deadline is required if you choose YES.');
+                        return;
+                    }
+                    addTask(text, deadline);
+                    document.body.removeChild(popup);
+                });
+            });
+
+            noBtn.addEventListener('click', () => {
+                addTask(text, null);
+                document.body.removeChild(popup);
+            });
+
+            function addTask(text, deadline) {
+                const date = dateInput.value;
+                const displayName = user.displayName || user.email;
+                const newTask = { id: 'temp-' + Date.now(), userId: user.uid, nickname: displayName, date, text, completed: false, deadline };
+                tasks.push(newTask);
+                renderTasks(tasks);
+                taskInput.value = "";
+                db.collection("tasks").add({
+                    userId: user.uid,
+                    nickname: displayName,
+                    date,
+                    text,
+                    completed: false,
+                    deadline,
+                    createdAt: new Date(),
+                }).catch(error => {
+                    tasks = tasks.filter(t => t.id !== newTask.id);
+                    renderTasks(tasks);
+                    alert('Error adding task: ' + error.message);
+                });
+            }
+        });
+
+        // Refresh tasks
+        refreshBtn.addEventListener("click", () => {
+            loadTasks();
+        });
+
+        // Handle task list clicks (checkbox and delete)
+        taskList.addEventListener("click", async (e) => {
+            const user = auth.currentUser;
+            if (!user) return;
+            const id = e.target.dataset.id;
+            if (!id) return;
+            const taskIndex = tasks.findIndex(t => t.id === id);
+            if (taskIndex === -1) return;
+            try {
+                const token = await user.getIdToken();
+                if (e.target.classList.contains("task-checkbox")) {
+                    const completed = e.target.checked;
+                    tasks[taskIndex].completed = completed;
+                    renderTasks(tasks);
+                    const response = await fetch(`http://localhost:5000/tasks/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify({ completed })
+                    });
+                    if (!response.ok) throw new Error('Failed to update task');
+                } else if (e.target.classList.contains("delete-btn")) {
+                    tasks[taskIndex].deleted = true;
+                    renderTasks(tasks);
+                    const response = await fetch(`http://localhost:5000/tasks/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify({ deleted: true })
+                    });
+                    if (!response.ok) throw new Error('Failed to delete task');
+                }
+            } catch (error) {
+                // Revert on error
+                if (e.target.classList.contains("task-checkbox")) {
+                    tasks[taskIndex].completed = !e.target.checked;
+                } else if (e.target.classList.contains("delete-btn")) {
+                    tasks[taskIndex].deleted = false;
+                }
+                renderTasks(tasks);
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // Load tasks when date changes
+        dateInput.addEventListener("change", () => {
+            localStorage.setItem('selectedDate', dateInput.value);
+            loadTasks();
+        });
+
+        // Initial load
+        loadTasks();
+
+        // Update date in real-time to keep it current
+        setInterval(() => {
+            if (isAdmin) {
+                const currentDate = new Date().toISOString().split('T')[0];
+                if (dateInput.value !== currentDate) {
+                    dateInput.value = currentDate;
+                    localStorage.setItem('selectedDate', currentDate);
+                    loadTasks();
+                }
+            } else {
+                const phDate = getPHDate();
+                if (dateInput.value !== phDate) {
+                    dateInput.value = phDate;
+                    localStorage.setItem('selectedDate', phDate);
+                    loadTasks();
+                }
+                dateInput.max = phDate;
+            }
+        }, 60000); // Check every minute
+    </script>
+</body>
+</html>

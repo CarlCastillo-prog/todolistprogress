@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login / Signup</title>
+    <link rel="stylesheet" href="login.css" />
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+</head>
+<body>
+    <div class="login">
+        <form id="auth-form">
+            <h1 id="form-title">Login</h1>
+            <div class="input-box">
+                <input type="text" id="username" placeholder="Username" required>
+                <i class='bx bxs-user'> </i>
+            </div>
+            <div class="input-box">
+                <input type="password" id="password" placeholder="Password" required>
+                <i class='bx bxs-lock-alt'></i>
+            </div>
+            <div class="remember-forgot" id="remember-forgot">
+                <label><input type="checkbox">Remember me</label>
+                <a href="#" id="forgot-link">Forgot password?</a>
+            </div>
+            <button type="submit" class="btn" id="submit-btn">Login</button>
+            <div class="register-link">
+                <p>Don't have an account? <a href="#" id="register-link">Register</a></p>
+            </div>
+        </form>
+        <div id="auth-message"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+
+    <script>
+        // Firebase config - replace with your own config
+        const firebaseConfig = {
+        apiKey: "AIzaSyBGDWQJiQ2MyPnKJhTlz7UYxIrarAYffx0",
+        authDomain: "todolist-99c61.firebaseapp.com",
+        projectId: "todolist-99c61",
+        storageBucket: "todolist-99c61.firebasestorage.app",
+        messagingSenderId: "249873754383",
+        appId: "1:249873754383:web:0757d9a0869b5459beb67a",
+        measurementId: "G-GGGGQP32BT"
+};
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        const form = document.getElementById("auth-form");
+        const formTitle = document.getElementById("form-title");
+        const usernameInput = document.getElementById("username");
+        const passwordInput = document.getElementById("password");
+        const rememberForgot = document.getElementById("remember-forgot");
+        const submitBtn = document.getElementById("submit-btn");
+        const registerLink = document.getElementById("register-link");
+        const forgotLink = document.getElementById("forgot-link");
+        const authMessage = document.getElementById("auth-message");
+
+        let isLogin = true;
+
+        // Toggle to register
+        registerLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            isLogin = false;
+            formTitle.textContent = "Register";
+            submitBtn.textContent = "Register";
+            rememberForgot.style.display = "none";
+            registerLink.parentElement.innerHTML = '<p>Already have an account? <a href="#" id="login-link">Login</a></p>';
+            document.getElementById("login-link").addEventListener("click", (e) => {
+                e.preventDefault();
+                isLogin = true;
+                formTitle.textContent = "Login";
+                submitBtn.textContent = "Login";
+                rememberForgot.style.display = "flex";
+                document.getElementById("login-link").parentElement.innerHTML = '<p>Don\'t have an account? <a href="#" id="register-link">Register</a></p>';
+                document.getElementById("register-link").addEventListener("click", (e) => {
+                    e.preventDefault();
+                    isLogin = false;
+                    formTitle.textContent = "Register";
+                    submitBtn.textContent = "Register";
+                    rememberForgot.style.display = "none";
+                    document.getElementById("register-link").parentElement.innerHTML = '<p>Already have an account? <a href="#" id="login-link">Login</a></p>';
+                });
+            });
+        });
+
+        // Forgot password
+        forgotLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            const email = usernameInput.value;
+            if (email) {
+                const actionCodeSettings = {
+                    url: 'http://localhost:3000/reset.html',
+                    handleCodeInApp: false
+                };
+                auth.sendPasswordResetEmail(email, actionCodeSettings)
+                    .then(() => {
+                        authMessage.textContent = "Password reset email sent.";
+                    })
+                    .catch((error) => {
+                        authMessage.textContent = error.message;
+                    });
+            } else {
+                authMessage.textContent = "Please enter your email.";
+            }
+        });
+
+        // Form submit
+        form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const email = usernameInput.value; // Treat username as email
+            const password = passwordInput.value;
+            authMessage.textContent = "";
+            authMessage.style.color = "#fff";
+            if (isLogin) {
+                // Log in
+                auth.signInWithEmailAndPassword(email, password)
+                    .then(() => {
+                        authMessage.textContent = "Logged in successfully. Redirecting...";
+                        authMessage.style.color = "#fff";
+                        setTimeout(() => {
+                            window.location.href = "todolist.html";
+                        }, 1000);
+                    })
+                    .catch((error) => {
+                        if (error.code === 'auth/invalid-email') {
+                            authMessage.textContent = "Invalid Email";
+                            authMessage.style.color = "red";
+                        } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials' || error.code === 'auth/user-not-found') {
+                            authMessage.textContent = "Wrong Password or Email";
+                            authMessage.style.color = "red";
+                        } else {
+                            authMessage.textContent = error.message;
+                            authMessage.style.color = "red";
+                        }
+                    });
+            } else {
+                // Sign up
+                auth.createUserWithEmailAndPassword(email, password)
+                    .then(() => {
+                        authMessage.textContent = "Sign up successful. Redirecting...";
+                        authMessage.style.color = "#fff";
+                        setTimeout(() => {
+                            window.location.href = "todolist.html";
+                        }, 1000);
+                    })
+                    .catch((error) => {
+                        if (error.code === 'auth/invalid-email') {
+                            authMessage.textContent = "Invalid Email";
+                            authMessage.style.color = "red";
+                        } else {
+                            authMessage.textContent = error.message;
+                            authMessage.style.color = "red";
+                        }
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

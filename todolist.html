@@ -365,7 +365,7 @@
                     const completed = e.target.checked;
                     tasks[taskIndex].completed = completed;
                     renderTasks(tasks);
-                    const response = await fetch(`http://localhost:5000/tasks/${id}`, {
+                    const response = await fetch(`http://${window.location.hostname}:5000/tasks/${id}`, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
@@ -374,17 +374,17 @@
                         body: JSON.stringify({ completed })
                     });
                     if (!response.ok) throw new Error('Failed to update task');
-                } else if (e.target.classList.contains("delete-btn")) {
-                    tasks[taskIndex].deleted = true;
-                    renderTasks(tasks);
-                    const response = await fetch(`http://localhost:5000/tasks/${id}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + token
-                        },
-                        body: JSON.stringify({ deleted: true })
-                    });
+            } else if (e.target.classList.contains("delete-btn")) {
+                tasks[taskIndex].deleted = true;
+                renderTasks(tasks);
+                const response = await fetch(`http://${window.location.hostname}:5000/tasks/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ deleted: true })
+                });
                     if (!response.ok) throw new Error('Failed to delete task');
                 }
             } catch (error) {
